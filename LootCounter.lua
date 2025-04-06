@@ -107,6 +107,11 @@ end
 -- Fonction pour analyser les messages de loot
 local function TrackLoot(self, event, message, ...)
     if event == "CHAT_MSG_LOOT" and message then
+        -- Vérifier que le message concerne ton propre loot
+        if not message:match("^Vous recevez") and not message:match("^You receive") then
+            return -- Ignore les loots des autres joueurs
+        end
+		
         local itemLink = string.match(message, "|Hitem:.-|h.-|h")
         if itemLink then
             local itemID = string.match(itemLink, "item:(%d+)")
