@@ -111,7 +111,7 @@ end
 local function TrackLoot(self, event, message, ...)
     if event == "CHAT_MSG_LOOT" and message then
         -- Vérifier que le message concerne ton propre loot
-        if not message:match("^Vous recevez") and not message:match("^You receive") then
+        if not message:match("^Vous recevez") and not message:match("^You receive") and not message:match("^Sie erhalten") and not message:match("^Вы получили") then
             return -- Ignore les loots des autres joueurs
         end
 		
