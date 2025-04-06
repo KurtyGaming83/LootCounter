@@ -1,3 +1,6 @@
+-- Coded by bnet : kurty#2232
+-- v.0.2
+
 -- Définir la base de données persistante
 local db
 local isFarmSessionActive = false
