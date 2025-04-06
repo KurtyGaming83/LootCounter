@@ -1,0 +1,6 @@
+## Interface: 110105
+## Title: Loot Counter
+## Notes: Compte les loots d'items spécifiques et les affiche dans le tooltip
+## SavedVariablesPerCharacter: LootCounterDB
+
+LootCounter.lua
