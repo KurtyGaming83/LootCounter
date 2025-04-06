@@ -52,6 +52,10 @@ local mineralItems = {
 
 -- Liste des objets interactifs (comme "Tas de cire")
 local interactiveObjects = {
+    ["Magot du gardien"] = true, -- 444066
+    ["Keeper's Stash"] = true,
+	["Schatz des Hüters"] = true,
+	["Тайник хранителя"] = true,
     ["Tas de cire"] = true, -- 419696
     ["Waxy Lump"] = true,
 	["Wachsstück"] = true,
@@ -76,7 +80,22 @@ local interactiveObjects = {
 	["Stargazer Swarm"] = true,
 	["Sternguckerschwarm"] = true,
 	["Косяк звездочета"] = true,
-	
+	["Bassin de bars des rivières"] = true, -- 451674
+	["River Bass Pool"] = true,
+	["Flussbarschteich"] = true,
+	["Косяк речного окуня"] = true,
+	["Ruissellement de gentepression"] = true, -- 457157
+	["Steamwheedle Runoff"] = true,
+	["Dampfdruckabfluss"] = true,
+	["Сточные воды Хитрой Шестеренки"] = true,
+	["Torrent de cherchepêches"] = true, -- 451675
+	["Anglerseeker Torrent"] = true,
+	["Anglersucherstrom"] = true,
+	["Поток с ловцами удильщиков"] = true,
+	["Banc de mérous sombroeil"] = true, -- 414622
+	["Shadowblind Grouper School"] = true,
+	["Schwarm schattenblinder Barsche"] = true,
+	["Косяк окуня темной слепоты"] = true,	
 }
 
 -- Fonction pour détecter la source du loot
