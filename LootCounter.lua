@@ -1,5 +1,5 @@
 -- Coded by bnet : kurty#2232
--- v.0.3 (updated with filter functionality)
+-- v.0.7 (removed debug messages)
 
 -- Définir la base de données persistante
 local db
@@ -95,43 +95,32 @@ local interactiveObjects = {
     ["Banc de mérous sombroeil"] = true, -- 414622
     ["Shadowblind Grouper School"] = true,
     ["Schwarm schattenblinder Barsche"] = true,
-    ["Косяк окуня темной слепоты"] = true, 
+    ["Косяк окуня темной слепоты"] = true,
 }
 
 -- Fonction pour détecter la source du loot
 local function GetLootSource(itemID, miningSource)
     local isMineral = mineralItems[itemID] or false
-    -- Priorité 1 : Minage récent (utiliser miningSource si disponible)
     if miningSource then
-        -- print("Source (minage récent) : " .. miningSource)
         return miningSource
     end
-    -- Priorité 2 : Source de la session de loot en cours (définie dans LOOT_OPENED)
     if currentLootSource then
-        -- print("Source (session de loot) : " .. currentLootSource)
         return currentLootSource
     end
-    -- Priorité 3 : Ennemi tué
     if lastEnemyKilled then
-        -- print("Source (ennemi tué) : " .. lastEnemyKilled)
         return lastEnemyKilled
     end
-    -- Priorité 4 : Objet interactif
     if lastMouseoverTarget and interactiveObjects[lastMouseoverTarget] then
-        -- print("Source (objet interactif) : " .. lastMouseoverTarget)
         return lastMouseoverTarget
     end
-    -- Dernier recours
-    -- print("Aucune source détectée")
     return "Inconnu"
 end
 
 -- Fonction pour analyser les messages de loot
 local function TrackLoot(self, event, message, ...)
     if event == "CHAT_MSG_LOOT" and message then
-        -- Vérifier que le message concerne ton propre loot
         if not message:match("^Vous recevez") and not message:match("^You receive") and not message:match("^Sie erhalten") and not message:match("^Вы получили") then
-            return -- Ignore les loots des autres joueurs
+            return
         end
         
         local itemLink = string.match(message, "|Hitem:.-|h.-|h")
@@ -141,9 +130,7 @@ local function TrackLoot(self, event, message, ...)
                 itemID = tonumber(itemID)
                 local quantity = string.match(message, "x(%d+)") or 1
                 quantity = tonumber(quantity)
-                -- print("Debug avant GetLootSource - lastEnemyKilled: " .. (lastEnemyKilled or "nil") .. ", currentLootSource: " .. (currentLootSource or "nil"))
-                local source = GetLootSource(itemID, currentMiningSource) -- Utiliser currentMiningSource
-                -- print("Item ID " .. itemID .. " compté, source : " .. source .. ", quantity : " .. quantity)
+                local source = GetLootSource(itemID, currentMiningSource)
                 if not db.entries then
                     db.entries = {}
                 end
@@ -179,19 +166,11 @@ local function TrackLoot(self, event, message, ...)
                 end
                 if globalStatsWindow and globalStatsWindow.UpdateTable then
                     globalStatsWindow.UpdateTable()
-                else
-                    -- print("Erreur : globalStatsWindow ou UpdateTable non défini")
                 end
                 if sessionStatsWindow and sessionStatsWindow.UpdateTable then
                     sessionStatsWindow.UpdateTable()
-                else
-                    -- print("Erreur : sessionStatsWindow ou UpdateTable non défini")
                 end
-            else
-                -- print("Erreur : Impossible d'extraire l'item ID")
             end
-        else
-            -- print("Erreur : Aucun lien d'item trouvé dans le message")
         end
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
         local timestamp, subEvent, _, sourceGUID, sourceName, _, _, destGUID, destName = CombatLogGetCurrentEventInfo()
@@ -206,42 +185,33 @@ local function TrackLoot(self, event, message, ...)
             if isEnemy and destName then
                 lastEnemyKilled = destName
                 lastEnemyKilledTime = time()
-                -- print("Ennemi tué : " .. lastEnemyKilled .. ", Timestamp: " .. lastEnemyKilledTime)
             end
         end
     elseif event == "LOOT_OPENED" then
-        -- print("LOOT_OPENED déclenché - lastEnemyKilled: " .. (lastEnemyKilled or "nil") .. ", lastMouseoverTarget: " .. (lastMouseoverTarget or "nil") .. ", lastTarget: " .. (lastTarget or "nil"))
         local sourceName = lastMouseoverTarget or lastTarget
-        -- Stocker la source de minage au moment de LOOT_OPENED
         local miningSource = nil
         if lastMiningTarget and lastMiningTime and (time() - lastMiningTime) <= 10 then
             miningSource = lastMiningTarget
             currentLootSource = lastMiningTarget
-            -- print("Loot ouvert, source de minage détectée (via lastMiningTarget) : " .. lastMiningTarget)
         elseif sourceName and (sourceName:find("Gisement") or sourceName:find("Veine") or sourceName:find("Deposit") or sourceName:find("Riche") or sourceName:find("Mine-Trankil") or sourceName:find("Bismuth") or sourceName:find("Griffefer")) then
             lastMiningTarget = sourceName
             lastMiningTime = time()
             miningSource = sourceName
             currentLootSource = sourceName
-            -- print("Loot ouvert, source de minage détectée : " .. lastMiningTarget)
         elseif sourceName and interactiveObjects[sourceName] then
             currentLootSource = sourceName
-            -- print("Loot ouvert, objet interactif détecté : " .. sourceName)
         elseif sourceName then
             currentLootSource = sourceName
-            -- print("Loot ouvert, source par défaut (lastMouseoverTarget ou lastTarget) : " .. sourceName)
         else
             if lastEnemyKilled then
                 currentLootSource = lastEnemyKilled
-                -- print("Loot ouvert, source ennemie détectée : " .. lastEnemyKilled)
             end
         end
-        -- Stocker la source de minage pour les appels à GetLootSource
         currentMiningSource = miningSource
     end
 end
 
--- Fonction pour modifier le tooltip (déplacée avant le gestionnaire d'événements)
+-- Fonction pour modifier le tooltip
 local function UpdateTooltip(tooltip)
     if not tooltip then return end
     if not TooltipUtil or not TooltipUtil.GetDisplayedItem then return end
@@ -277,6 +247,7 @@ end
 -- Créer une fenêtre pour afficher les statistiques globales
 local function CreateGlobalStatsWindow()
     local frame = CreateFrame("Frame", "LootCounterGlobalStatsWindow", UIParent, "BasicFrameTemplateWithInset")
+    if not frame then return nil end
     frame:SetSize(550, 350)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
@@ -292,7 +263,6 @@ local function CreateGlobalStatsWindow()
     frame.title:SetPoint("TOP", 0, -5)
     frame.title:SetText("Loot Counter - Global Stats")
 
-    -- Bouton Farm (toggle pour ouvrir/fermer la fenêtre de session)
     local farmButton = CreateFrame("Button", "LootCounterOpenFarmButton", frame, "UIPanelButtonTemplate")
     farmButton:SetPoint("TOPRIGHT", -30, 0)
     farmButton:SetSize(100, 20)
@@ -304,40 +274,59 @@ local function CreateGlobalStatsWindow()
             else
                 sessionStatsWindow:Show()
             end
-        else
-            -- print("La fenêtre de session n'est pas encore prête.")
         end
     end)
 
-    -- Champ de filtre
-    local filterEditBox = CreateFrame("EditBox", "LootCounterGlobalFilterEditBox", frame, "InputBoxTemplate")
-    filterEditBox:SetPoint("TOPLEFT", 10, -30)
-    filterEditBox:SetSize(150, 20)
-    filterEditBox:SetAutoFocus(false)
-    filterEditBox:SetFontObject("GameFontHighlight")
-    filterEditBox:SetTextInsets(5, 5, 0, 0)
-    filterEditBox:SetScript("OnTextChanged", function(self)
-        frame.filterText = self:GetText():lower()
+    local itemFilterLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    itemFilterLabel:SetPoint("TOPLEFT", 10, -30)
+    itemFilterLabel:SetText("Filtre Item :")
+
+    local itemFilterEditBox = CreateFrame("EditBox", "LootCounterGlobalItemFilterEditBox", frame, "InputBoxTemplate")
+    itemFilterEditBox:SetPoint("TOPLEFT", 10, -50)
+    itemFilterEditBox:SetSize(150, 20)
+    itemFilterEditBox:SetAutoFocus(false)
+    itemFilterEditBox:SetFontObject("GameFontHighlight")
+    itemFilterEditBox:SetTextInsets(5, 5, 0, 0)
+    itemFilterEditBox:SetScript("OnTextChanged", function(self)
+        frame.itemFilterText = self:GetText():lower()
         frame.UpdateTable()
     end)
-    filterEditBox:SetScript("OnEnterPressed", function(self)
+    itemFilterEditBox:SetScript("OnEnterPressed", function(self)
         self:ClearFocus()
     end)
-    filterEditBox:SetScript("OnEscapePressed", function(self)
+    itemFilterEditBox:SetScript("OnEscapePressed", function(self)
         self:SetText("")
-        frame.filterText = ""
+        frame.itemFilterText = ""
         frame.UpdateTable()
         self:ClearFocus()
     end)
 
-    -- Étiquette pour le champ de filtre
-    local filterLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    filterLabel:SetPoint("RIGHT", filterEditBox, "LEFT", -5, 0)
-    filterLabel:SetText("Filter:")
+    local sourceFilterLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    sourceFilterLabel:SetPoint("TOPLEFT", 180, -30)
+    sourceFilterLabel:SetText("Filtre Source :")
 
-    -- Boutons de tri (déplacés pour laisser de la place au filtre)
+    local sourceFilterEditBox = CreateFrame("EditBox", "LootCounterGlobalSourceFilterEditBox", frame, "InputBoxTemplate")
+    sourceFilterEditBox:SetPoint("TOPLEFT", 180, -50)
+    sourceFilterEditBox:SetSize(150, 20)
+    sourceFilterEditBox:SetAutoFocus(false)
+    sourceFilterEditBox:SetFontObject("GameFontHighlight")
+    sourceFilterEditBox:SetTextInsets(5, 5, 0, 0)
+    sourceFilterEditBox:SetScript("OnTextChanged", function(self)
+        frame.sourceFilterText = self:GetText():lower()
+        frame.UpdateTable()
+    end)
+    sourceFilterEditBox:SetScript("OnEnterPressed", function(self)
+        self:ClearFocus()
+    end)
+    sourceFilterEditBox:SetScript("OnEscapePressed", function(self)
+        self:SetText("")
+        frame.sourceFilterText = ""
+        frame.UpdateTable()
+        self:ClearFocus()
+    end)
+
     local sortByNameButton = CreateFrame("Button", "LootCounterGlobalSortByNameButton", frame, "UIPanelButtonTemplate")
-    sortByNameButton:SetPoint("TOPLEFT", 10, -60)
+    sortByNameButton:SetPoint("TOPLEFT", 10, -80)
     sortByNameButton:SetSize(80, 20)
     sortByNameButton:SetText("Item Name")
     sortByNameButton:SetScript("OnClick", function()
@@ -346,7 +335,7 @@ local function CreateGlobalStatsWindow()
     end)
 
     local sortBySourceButton = CreateFrame("Button", "LootCounterGlobalSortBySourceButton", frame, "UIPanelButtonTemplate")
-    sortBySourceButton:SetPoint("TOPLEFT", 260, -60) -- Aligné avec la colonne Source
+    sortBySourceButton:SetPoint("TOPLEFT", 260, -80)
     sortBySourceButton:SetSize(80, 20)
     sortBySourceButton:SetText("Source")
     sortBySourceButton:SetScript("OnClick", function()
@@ -355,7 +344,7 @@ local function CreateGlobalStatsWindow()
     end)
 
     local sortByCountButton = CreateFrame("Button", "LootCounterGlobalSortByCountButton", frame, "UIPanelButtonTemplate")
-    sortByCountButton:SetPoint("TOPLEFT", 460, -60) -- Aligné avec la colonne Quantité
+    sortByCountButton:SetPoint("TOPLEFT", 460, -80)
     sortByCountButton:SetSize(80, 20)
     sortByCountButton:SetText("Quantity")
     sortByCountButton:SetScript("OnClick", function()
@@ -364,18 +353,17 @@ local function CreateGlobalStatsWindow()
     end)
 
     frame.sortMode = "name"
-    frame.filterText = "" -- Initialiser le texte du filtre
+    frame.itemFilterText = ""
+    frame.sourceFilterText = ""
 
-    -- ScrollFrame pour le tableau (décalé pour laisser de la place au filtre et aux boutons)
     local scrollFrame = CreateFrame("ScrollFrame", "LootCounterGlobalStatsScrollFrame", frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 10, -90) -- Décalé vers le bas
+    scrollFrame:SetPoint("TOPLEFT", 10, -110)
     scrollFrame:SetPoint("BOTTOMRIGHT", -30, 10)
 
     local content = CreateFrame("Frame", "LootCounterGlobalStatsContent", scrollFrame)
     content:SetSize(500, 200)
     scrollFrame:SetScrollChild(content)
 
-    -- Fonction pour mettre à jour le tableau
     local function UpdateTable()
         if content.rows then
             for _, row in ipairs(content.rows) do
@@ -385,14 +373,16 @@ local function CreateGlobalStatsWindow()
         content.rows = {}
 
         local sortedEntries = {}
-        for _, entry in ipairs(db.entries) do
+        for _, entry in ipairs(db.entries or {}) do
             local itemName = GetItemInfo(entry.itemID)
             if itemName then
-                -- Appliquer le filtre
-                local filterText = frame.filterText or ""
+                local itemFilterText = frame.itemFilterText or ""
+                local sourceFilterText = frame.sourceFilterText or ""
                 local itemNameLower = itemName:lower()
                 local sourceLower = entry.source:lower()
-                if filterText == "" or itemNameLower:find(filterText) or sourceLower:find(filterText) then
+                local itemMatch = itemFilterText == "" or itemNameLower:find(itemFilterText)
+                local sourceMatch = sourceFilterText == "" or sourceLower:find(sourceFilterText)
+                if itemMatch and sourceMatch then
                     table.insert(sortedEntries, { itemName = itemName, itemID = entry.itemID, source = entry.source, count = entry.count })
                 end
             end
@@ -464,13 +454,13 @@ local function CreateGlobalStatsWindow()
     UpdateTable()
 
     frame:Hide()
-
     return frame
 end
 
 -- Créer une fenêtre pour afficher les statistiques de la session de farm
 local function CreateSessionStatsWindow()
     local frame = CreateFrame("Frame", "LootCounterSessionStatsWindow", UIParent, "BasicFrameTemplateWithInset")
+    if not frame then return nil end
     frame:SetSize(550, 350)
     frame:SetPoint("CENTER", 200, 0)
     frame:SetMovable(true)
@@ -479,15 +469,12 @@ local function CreateSessionStatsWindow()
     frame:SetScript("OnDragStart", frame.StartMoving)
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 
-    -- Stocker la référence à la fenêtre
     sessionStatsWindow = frame
 
-    -- Titre
     frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     frame.title:SetPoint("TOP", 0, -5)
     frame.title:SetText("Loot Counter - Session de Farm")
 
-    -- Onglets pour basculer entre "Session Actuelle" et "Historique"
     local currentTab = CreateFrame("Button", "LootCounterSessionCurrentTab", frame, "UIPanelButtonTemplate")
     currentTab:SetPoint("TOPLEFT", 10, -30)
     currentTab:SetSize(100, 20)
@@ -501,7 +488,6 @@ local function CreateSessionStatsWindow()
         frame.lastSessionText:Show()
         farmButton:Show()
         frame.resetButton:Show()
-        -- Afficher les boutons de tri
         frame.sortButtons.name:Show()
         frame.sortButtons.source:Show()
         frame.sortButtons.count:Show()
@@ -520,27 +506,22 @@ local function CreateSessionStatsWindow()
         frame.lastSessionText:Hide()
         farmButton:Hide()
         frame.resetButton:Hide()
-        -- Masquer les boutons de tri
         frame.sortButtons.name:Hide()
         frame.sortButtons.source:Hide()
         frame.sortButtons.count:Hide()
     end)
 
-    -- Vue par défaut
     frame.currentView = "current"
 
-    -- Texte pour le chronomètre
     frame.timerText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     frame.timerText:SetPoint("TOPLEFT", 10, -60)
     frame.timerText:SetText("Farm Session : None")
 
-    -- Texte pour la dernière session terminée
     frame.lastSessionText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     frame.lastSessionText:SetPoint("TOPRIGHT", -10, -60)
     frame.lastSessionText:SetText("")
 
-    -- Boutons de tri pour la vue "Session Actuelle"
-    frame.sortButtons = {} -- Créer une table pour stocker les boutons
+    frame.sortButtons = {}
     frame.sortButtons.name = CreateFrame("Button", "LootCounterSessionSortByNameButton", frame, "UIPanelButtonTemplate")
     frame.sortButtons.name:SetPoint("TOPLEFT", 10, -80)
     frame.sortButtons.name:SetSize(80, 20)
@@ -568,10 +549,8 @@ local function CreateSessionStatsWindow()
         frame.UpdateTable()
     end)
 
-    -- Mode de tri par défaut
     frame.sortMode = "name"
 
-    -- ScrollFrame pour la vue "Session Actuelle"
     frame.scrollFrame = CreateFrame("ScrollFrame", "LootCounterSessionStatsScrollFrame", frame, "UIPanelScrollFrameTemplate")
     frame.scrollFrame:SetPoint("TOPLEFT", 10, -110)
     frame.scrollFrame:SetPoint("BOTTOMRIGHT", -30, 50)
@@ -580,7 +559,6 @@ local function CreateSessionStatsWindow()
     content:SetSize(500, 200)
     frame.scrollFrame:SetScrollChild(content)
 
-    -- ScrollFrame pour la vue "Historique"
     frame.historyScrollFrame = CreateFrame("ScrollFrame", "LootCounterSessionHistoryScrollFrame", frame, "UIPanelScrollFrameTemplate")
     frame.historyScrollFrame:SetPoint("TOPLEFT", 10, -30)
     frame.historyScrollFrame:SetPoint("BOTTOMRIGHT", -30, 10)
@@ -590,7 +568,6 @@ local function CreateSessionStatsWindow()
     historyContent:SetSize(500, 200)
     frame.historyScrollFrame:SetScrollChild(historyContent)
 
-    -- Bouton Start/Stop pour la session de farm
     farmButton = CreateFrame("Button", "LootCounterFarmButton", frame, "UIPanelButtonTemplate")
     farmButton:SetPoint("BOTTOMLEFT", 10, 10)
     farmButton:SetSize(100, 30)
@@ -599,9 +576,8 @@ local function CreateSessionStatsWindow()
         if isFarmSessionActive then
             isFarmSessionActive = false
             farmButton:SetText("Start Farm")
-            farmTimerFrame:SetScript("OnUpdate", nil) -- Arrêter le timer
+            farmTimerFrame:SetScript("OnUpdate", nil)
             local elapsedTime = time() - farmStartTime
-            -- Sauvegarder la session dans l'historique avec les items lootés
             if not db.farmSessionHistory then
                 db.farmSessionHistory = {}
             end
@@ -618,15 +594,13 @@ local function CreateSessionStatsWindow()
             table.insert(db.farmSessionHistory, sessionData)
             frame.timerText:SetText("Farm Session : None")
             frame.lastSessionText:SetText("Last session : " .. FormatTime(elapsedTime))
-            -- print("Session de farm terminée, durée : " .. FormatTime(elapsedTime))
         else
             isFarmSessionActive = true
             farmButton:SetText("Stop Farm")
-            db.farmSession = {} -- Réinitialiser la session de farm
-            db.farmSession.entries = {} -- Réinitialiser les entrées de la session
-            farmStartTime = time() -- Enregistrer le temps de départ
-            db.farmSession.startTime = farmStartTime -- Sauvegarder dans la DB
-            -- Mettre à jour le timer toutes les secondes
+            db.farmSession = {}
+            db.farmSession.entries = {}
+            farmStartTime = time()
+            db.farmSession.startTime = farmStartTime
             farmTimerFrame:SetScript("OnUpdate", function(self, elapsed)
                 self.timeSinceLastUpdate = (self.timeSinceLastUpdate or 0) + elapsed
                 if self.timeSinceLastUpdate >= 1 then
@@ -635,23 +609,19 @@ local function CreateSessionStatsWindow()
                     self.timeSinceLastUpdate = 0
                 end
             end)
-            -- print("Session de farm démarrée")
         end
-        -- Rafraîchir le tableau après avoir modifié l'état
         local updateTableFunc = frame.UpdateTable
         if updateTableFunc then
             updateTableFunc()
         end
     end)
 
-    -- Bouton pour réinitialiser les données de farm
     frame.resetButton = CreateFrame("Button", "LootCounterResetFarmButton", frame, "UIPanelButtonTemplate")
     frame.resetButton:SetPoint("BOTTOM", 0, 10)
     frame.resetButton:SetSize(100, 30)
     frame.resetButton:SetText("Reinit")
     frame.resetButton:SetScript("OnClick", function()
         if isFarmSessionActive then
-            -- print("Arrêtez la session de farm avant de réinitialiser.")
             return
         end
         db.farmSession = {}
@@ -661,14 +631,11 @@ local function CreateSessionStatsWindow()
         if updateTableFunc then
             updateTableFunc()
         end
-        -- print("Données de farm réinitialisées")
     end)
 
-    -- Fonction pour mettre à jour le tableau (Session Actuelle)
     local function UpdateTable()
         if frame.currentView ~= "current" then return end
 
-        -- Supprimer les anciennes lignes
         if content.rows then
             for _, row in ipairs(content.rows) do
                 row:Hide()
@@ -676,7 +643,6 @@ local function CreateSessionStatsWindow()
         end
         content.rows = {}
 
-        -- Créer une table temporaire pour trier les entrées
         local sortedEntries = {}
         if db.farmSession and db.farmSession.entries then
             for _, entry in ipairs(db.farmSession.entries) do
@@ -687,7 +653,6 @@ local function CreateSessionStatsWindow()
             end
         end
 
-        -- Trier les entrées selon le mode de tri
         if frame.sortMode == "name" then
             table.sort(sortedEntries, function(a, b)
                 return a.itemName < b.itemName
@@ -702,7 +667,6 @@ local function CreateSessionStatsWindow()
             end)
         end
 
-        -- Ajouter les nouvelles lignes
         local yOffset = -30
         local rowIndex = 1
         for _, entry in ipairs(sortedEntries) do
@@ -712,7 +676,6 @@ local function CreateSessionStatsWindow()
                 row:SetPoint("TOPLEFT", 10, yOffset)
                 row:SetSize(500, 20)
 
-                -- Nom de l'item (cliquable avec tooltip)
                 local col1 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
                 col1:SetPoint("LEFT", 0, 0)
                 col1:SetText(itemLink or itemName)
@@ -728,14 +691,12 @@ local function CreateSessionStatsWindow()
                     GameTooltip:Hide()
                 end)
 
-                -- Source
                 local col2 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
                 col2:SetPoint("LEFT", 200, 0)
                 col2:SetWidth(200)
                 col2:SetJustifyH("LEFT")
                 col2:SetText(entry.source)
 
-                -- Quantité
                 local col3 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
                 col3:SetPoint("LEFT", 400, 0)
                 col3:SetText(entry.count)
@@ -748,7 +709,6 @@ local function CreateSessionStatsWindow()
         content:SetHeight(rowIndex * 20)
     end
 
-    -- Fonction pour mettre à jour le tableau (Historique)
     local function UpdateHistoryTable()
         if frame.currentView ~= "history" then return end
 
@@ -761,7 +721,6 @@ local function CreateSessionStatsWindow()
 
         local yOffset = -10
         local rowIndex = 1
-        -- print("Debug - db.farmSessionHistory : " .. tostring(db.farmSessionHistory))
         if db.farmSessionHistory and type(db.farmSessionHistory) == "table" then
             for i, session in ipairs(db.farmSessionHistory) do
                 local sessionHeader = historyContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -770,7 +729,6 @@ local function CreateSessionStatsWindow()
                 table.insert(historyContent.rows, sessionHeader)
                 yOffset = yOffset - 20
 
-                -- Vérifier que session.entries est une table avant d'itérer
                 if session.entries and type(session.entries) == "table" then
                     for _, entry in ipairs(session.entries) do
                         local itemName, itemLink = GetItemInfo(entry.itemID)
@@ -809,8 +767,6 @@ local function CreateSessionStatsWindow()
                             rowIndex = rowIndex + 1
                         end
                     end
-                else
-                    -- print("Debug - session.entries manquant ou invalide pour la session " .. i)
                 end
                 yOffset = yOffset - 10
             end
@@ -824,20 +780,16 @@ local function CreateSessionStatsWindow()
         historyContent:SetHeight(rowIndex * 20)
     end
 
-    -- Stocker les fonctions UpdateTable et UpdateHistoryTable dans le frame
     frame.UpdateTable = UpdateTable
     frame.UpdateHistoryTable = UpdateHistoryTable
 
-    -- Mettre à jour le tableau au démarrage
     UpdateTable()
 
-    -- Afficher la durée de la dernière session terminée
     if db.farmSessionHistory and #db.farmSessionHistory > 0 then
         local lastSession = db.farmSessionHistory[#db.farmSessionHistory]
         frame.lastSessionText:SetText("Last session : " .. FormatTime(lastSession.duration))
     end
 
-    -- Restaurer le chronomètre si une session est en cours
     if isFarmSessionActive and db.farmSession and db.farmSession.startTime then
         farmStartTime = db.farmSession.startTime
         farmButton:SetText("Stop Farm")
@@ -845,19 +797,17 @@ local function CreateSessionStatsWindow()
             self.timeSinceLastUpdate = (self.timeSinceLastUpdate or 0) + elapsed
             if self.timeSinceLastUpdate >= 1 then
                 local elapsedTime = time() - farmStartTime
-                frame.timerText:SetText("Session de farm en cours : " .. FormatTime(elapsedTime))
+                frame.timerText:SetText("Current Farm Session : " .. FormatTime(elapsedTime))
                 self.timeSinceLastUpdate = 0
             end
         end)
     end
     
-    -- Masquer la fenêtre par défaut
     frame:Hide()
-
     return frame
 end
 
--- Gestionnaire d'événements (doit être défini après toutes les fonctions qu'il utilise)
+-- Gestionnaire d'événements
 frame:SetScript("OnEvent", function(self, event, arg1, ...)
     if event == "ADDON_LOADED" and arg1 == addonName then
         if not LootCounterDB then
@@ -871,7 +821,6 @@ frame:SetScript("OnEvent", function(self, event, arg1, ...)
 
         if not db.farmSessionHistory then
             db.farmSessionHistory = {}
-            -- print("Initialisation de db.farmSessionHistory")
         end
         if not db.farmSession then
             db.farmSession = {}
@@ -883,7 +832,6 @@ frame:SetScript("OnEvent", function(self, event, arg1, ...)
         globalStatsWindow = CreateGlobalStatsWindow()
         sessionStatsWindow = CreateSessionStatsWindow()
     elseif event == "PLAYER_LOGIN" then
-        -- print("Loot Counter chargé !")
         db = LootCounterDB or {}
         LootCounterDB = db
 
@@ -912,11 +860,9 @@ frame:SetScript("OnEvent", function(self, event, arg1, ...)
                     db.farmSession.startTime = oldData.farmSession.startTime
                 end
             end
-            -- Toujours initialiser db.farmSessionHistory, même si oldData.farmSessionHistory n'existe pas
             db.farmSessionHistory = oldData.farmSessionHistory or {}
         end
 
-        -- S'assurer que les structures nécessaires existent
         if not db.entries then
             db.entries = {}
         end
@@ -930,33 +876,6 @@ frame:SetScript("OnEvent", function(self, event, arg1, ...)
             db.farmSessionHistory = {}
         end
 
-        -- print("Contenu de LootCounterDB au démarrage :")
-        for key, value in pairs(db) do
-            if key == "farmSession" then
-                -- print("Session de farm :")
-                if value.entries then
-                    for _, entry in ipairs(value.entries) do
-                        -- print("Item ID " .. entry.itemID .. " : { source = " .. entry.source .. ", count = " .. entry.count .. " }")
-                    end
-                end
-            elseif key == "farmSessionHistory" then
-                -- print("Historique des sessions de farm :")
-                for i, session in ipairs(value) do
-                    -- print("Session " .. i .. " : durée = " .. FormatTime(session.duration) .. ", terminée à " .. date("%Y-%m-%d %H:%M:%S", session.endTime))
-                    if session.entries then
-                        for _, entry in ipairs(session.entries) do
-                            -- print("  Item ID " .. entry.itemID .. " : { source = " .. entry.source .. ", count = " .. entry.count .. " }")
-                        end
-                    end
-                end
-            elseif key == "entries" then
-                -- print("Entrées globales :")
-                for _, entry in ipairs(value) do
-                    -- print("Item ID " .. entry.itemID .. " : { source = " .. entry.source .. ", count = " .. entry.count .. " }")
-                end
-            end
-        end
-
         if db.farmSession and db.farmSession.startTime then
             isFarmSessionActive = true
             farmStartTime = db.farmSession.startTime
@@ -966,9 +885,6 @@ frame:SetScript("OnEvent", function(self, event, arg1, ...)
             TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip)
                 UpdateTooltip(tooltip)
             end)
-            -- print("Hook TooltipDataProcessor configuré")
-        else
-            -- print("TooltipDataProcessor non disponible")
         end
     elseif event == "CHAT_MSG_LOOT" or event == "COMBAT_LOG_EVENT_UNFILTERED" or event == "PLAYER_TARGET_CHANGED" or event == "LOOT_OPENED" then
         TrackLoot(self, event, arg1, ...)
@@ -976,78 +892,40 @@ frame:SetScript("OnEvent", function(self, event, arg1, ...)
             currentMiningSource = nil
         end    
     elseif event == "PLAYER_LOGOUT" then
-        -- print("Sauvegarde de LootCounterDB avant déconnexion :")
-        for key, value in pairs(db) do
-            if key == "farmSession" then
-                -- print("Session de farm :")
-                if value.entries then
-                    for _, entry in ipairs(value.entries) do
-                        -- print("Item ID " .. entry.itemID .. " : { source = " .. entry.source .. ", count = " .. entry.count .. " }")
-                    end
-                end
-            elseif key == "farmSessionHistory" then
-                -- print("Historique des sessions de farm :")
-                for i, session in ipairs(value) do
-                    -- print("Session " .. i .. " : durée = " .. FormatTime(session.duration) .. ", terminée à " .. date("%Y-%m-%d %H:%M:%S", session.endTime))
-                    if session.entries then
-                        for _, entry in ipairs(session.entries) do
-                            -- print("  Item ID " .. entry.itemID .. " : { source = " .. entry.source .. ", count = " .. entry.count .. " }")
-                        end
-                    end
-                end
-            elseif key == "entries" then
-                -- print("Entrées globales :")
-                for _, entry in ipairs(value) do
-                    -- print("Item ID " .. entry.itemID .. " : { source = " .. entry.source .. ", count = " .. entry.count .. " }")
-                end
-            end
-        end
         LootCounterDB = db
     end
 end)
 
--- Hook pour détecter les gisements ou objets interactifs survolés via le tooltip
+-- Hook pour détecter les gisements ou objets interactifs
 GameTooltip:HookScript("OnShow", function(self)
     local tooltipText = GameTooltipTextLeft1:GetText()
     if tooltipText then
-        -- print("Tooltip détecté : " .. tooltipText)
         lastMouseoverTarget = tooltipText
         if tooltipText:find("Gisement") or tooltipText:find("Veine") or tooltipText:find("Deposit") or tooltipText:find("Riche") or tooltipText:find("Mine-Trankil") or tooltipText:find("Bismuth") or tooltipText:find("Griffefer") then
             lastMiningTarget = tooltipText
             lastMiningTime = time()
-            -- print("Objet survolé détecté via tooltip (minage) : " .. lastMouseoverTarget)
-        elseif interactiveObjects[tooltipText] then
-            -- print("Objet survolé détecté via tooltip (interactif) : " .. lastMouseoverTarget)
         end
     end
 end)
 
--- Commandes pour afficher les fenêtres
+-- Commandes slash
 SLASH_LOOTCOUNTER1 = "/lootcounter"
 SlashCmdList["LOOTCOUNTER"] = function(msg)
     if msg == "show" then
         if globalStatsWindow then
             globalStatsWindow:Show()
-        else
-            -- print("La fenêtre globale n'est pas encore prête.")
         end
     elseif msg == "hide" then
         if globalStatsWindow then
             globalStatsWindow:Hide()
-        else
-            -- print("La fenêtre globale n'est pas encore prête.")
         end
     elseif msg == "showsession" then
         if sessionStatsWindow then
             sessionStatsWindow:Show()
-        else
-            -- print("La fenêtre de session n'est pas encore prête.")
         end
     elseif msg == "hidesession" then
         if sessionStatsWindow then
             sessionStatsWindow:Hide()
-        else
-            -- print("La fenêtre de session n'est pas encore prête.")
         end
     end
 end
