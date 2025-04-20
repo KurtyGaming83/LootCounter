@@ -1,5 +1,5 @@
 -- Coded by bnet : kurty#2232
--- v.0.2
+-- v.0.3 (updated with filter functionality)
 
 -- Définir la base de données persistante
 local db
@@ -54,48 +54,48 @@ local mineralItems = {
 local interactiveObjects = {
     ["Magot du gardien"] = true, -- 444066
     ["Keeper's Stash"] = true,
-	["Schatz des Hüters"] = true,
-	["Тайник хранителя"] = true,
+    ["Schatz des Hüters"] = true,
+    ["Тайник хранителя"] = true,
     ["Tas de cire"] = true, -- 419696
     ["Waxy Lump"] = true,
-	["Wachsstück"] = true,
-	["Восковой комок"] = true,
-	["Sol dérangé"] = true, -- 241838,422531
-	["Disturbed Earth"] = true,
-	["Aufgewühlte Erde"] = true,
-	["Потревоженная земля"] = true,
+    ["Wachsstück"] = true,
+    ["Восковой комок"] = true,
+    ["Sol dérangé"] = true, -- 241838,422531
+    ["Disturbed Earth"] = true,
+    ["Aufgewühlte Erde"] = true,
+    ["Потревоженная земля"] = true,
     ["Trésor de rivage"] = true,  -- 451673
-	["Shore Treasure"] = true,
-	["Uferschatz"] = true,
-	["Сокровище с берега"] = true,
+    ["Shore Treasure"] = true,
+    ["Uferschatz"] = true,
+    ["Сокровище с берега"] = true,
     ["Bassin scintillant"] = true, -- 451669
-	["Glimmerpool"] = true,
-	["Glimmerbecken"] = true,
-	["Мерцающий омут"] = true,
+    ["Glimmerpool"] = true,
+    ["Glimmerbecken"] = true,
+    ["Мерцающий омут"] = true,
     ["Clapotis de surface calme"] = true, -- 451670
-	["Calm Surfacing Ripple"] = true,
-	["Ruhige Oberflächenwellen"] = true,
-	["Тихая рябь"] = true,
-	["Nuée de mirétoiles"] = true, -- 451672
-	["Stargazer Swarm"] = true,
-	["Sternguckerschwarm"] = true,
-	["Косяк звездочета"] = true,
-	["Bassin de bars des rivières"] = true, -- 451674
-	["River Bass Pool"] = true,
-	["Flussbarschteich"] = true,
-	["Косяк речного окуня"] = true,
-	["Ruissellement de gentepression"] = true, -- 457157
-	["Steamwheedle Runoff"] = true,
-	["Dampfdruckabfluss"] = true,
-	["Сточные воды Хитрой Шестеренки"] = true,
-	["Torrent de cherchepêches"] = true, -- 451675
-	["Anglerseeker Torrent"] = true,
-	["Anglersucherstrom"] = true,
-	["Поток с ловцами удильщиков"] = true,
-	["Banc de mérous sombroeil"] = true, -- 414622
-	["Shadowblind Grouper School"] = true,
-	["Schwarm schattenblinder Barsche"] = true,
-	["Косяк окуня темной слепоты"] = true,	
+    ["Calm Surfacing Ripple"] = true,
+    ["Ruhige Oberflächenwellen"] = true,
+    ["Тихая рябь"] = true,
+    ["Nuée de mirétoiles"] = true, -- 451672
+    ["Stargazer Swarm"] = true,
+    ["Sternguckerschwarm"] = true,
+    ["Косяк звездочета"] = true,
+    ["Bassin de bars des rivières"] = true, -- 451674
+    ["River Bass Pool"] = true,
+    ["Flussbarschteich"] = true,
+    ["Косяк речного окуня"] = true,
+    ["Ruissellement de gentepression"] = true, -- 457157
+    ["Steamwheedle Runoff"] = true,
+    ["Dampfdruckabfluss"] = true,
+    ["Сточные воды Хитрой Шестеренки"] = true,
+    ["Torrent de cherchepêches"] = true, -- 451675
+    ["Anglerseeker Torrent"] = true,
+    ["Anglersucherstrom"] = true,
+    ["Поток с ловцами удильщиков"] = true,
+    ["Banc de mérous sombroeil"] = true, -- 414622
+    ["Shadowblind Grouper School"] = true,
+    ["Schwarm schattenblinder Barsche"] = true,
+    ["Косяк окуня темной слепоты"] = true, 
 }
 
 -- Fonction pour détecter la source du loot
@@ -133,7 +133,7 @@ local function TrackLoot(self, event, message, ...)
         if not message:match("^Vous recevez") and not message:match("^You receive") and not message:match("^Sie erhalten") and not message:match("^Вы получили") then
             return -- Ignore les loots des autres joueurs
         end
-		
+        
         local itemLink = string.match(message, "|Hitem:.-|h.-|h")
         if itemLink then
             local itemID = string.match(itemLink, "item:(%d+)")
@@ -292,7 +292,7 @@ local function CreateGlobalStatsWindow()
     frame.title:SetPoint("TOP", 0, -5)
     frame.title:SetText("Loot Counter - Global Stats")
 
-	-- Bouton Farm (toggle pour ouvrir/fermer la fenêtre de session)
+    -- Bouton Farm (toggle pour ouvrir/fermer la fenêtre de session)
     local farmButton = CreateFrame("Button", "LootCounterOpenFarmButton", frame, "UIPanelButtonTemplate")
     farmButton:SetPoint("TOPRIGHT", -30, 0)
     farmButton:SetSize(100, 20)
@@ -309,9 +309,35 @@ local function CreateGlobalStatsWindow()
         end
     end)
 
-    -- Boutons de tri (placés directement dans la frame principale, au-dessus du ScrollFrame)
+    -- Champ de filtre
+    local filterEditBox = CreateFrame("EditBox", "LootCounterGlobalFilterEditBox", frame, "InputBoxTemplate")
+    filterEditBox:SetPoint("TOPLEFT", 10, -30)
+    filterEditBox:SetSize(150, 20)
+    filterEditBox:SetAutoFocus(false)
+    filterEditBox:SetFontObject("GameFontHighlight")
+    filterEditBox:SetTextInsets(5, 5, 0, 0)
+    filterEditBox:SetScript("OnTextChanged", function(self)
+        frame.filterText = self:GetText():lower()
+        frame.UpdateTable()
+    end)
+    filterEditBox:SetScript("OnEnterPressed", function(self)
+        self:ClearFocus()
+    end)
+    filterEditBox:SetScript("OnEscapePressed", function(self)
+        self:SetText("")
+        frame.filterText = ""
+        frame.UpdateTable()
+        self:ClearFocus()
+    end)
+
+    -- Étiquette pour le champ de filtre
+    local filterLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    filterLabel:SetPoint("RIGHT", filterEditBox, "LEFT", -5, 0)
+    filterLabel:SetText("Filter:")
+
+    -- Boutons de tri (déplacés pour laisser de la place au filtre)
     local sortByNameButton = CreateFrame("Button", "LootCounterGlobalSortByNameButton", frame, "UIPanelButtonTemplate")
-    sortByNameButton:SetPoint("TOPLEFT", 10, -30)
+    sortByNameButton:SetPoint("TOPLEFT", 10, -60)
     sortByNameButton:SetSize(80, 20)
     sortByNameButton:SetText("Item Name")
     sortByNameButton:SetScript("OnClick", function()
@@ -320,7 +346,7 @@ local function CreateGlobalStatsWindow()
     end)
 
     local sortBySourceButton = CreateFrame("Button", "LootCounterGlobalSortBySourceButton", frame, "UIPanelButtonTemplate")
-    sortBySourceButton:SetPoint("TOPLEFT", 260, -30) -- Aligné avec la colonne Source
+    sortBySourceButton:SetPoint("TOPLEFT", 260, -60) -- Aligné avec la colonne Source
     sortBySourceButton:SetSize(80, 20)
     sortBySourceButton:SetText("Source")
     sortBySourceButton:SetScript("OnClick", function()
@@ -329,7 +355,7 @@ local function CreateGlobalStatsWindow()
     end)
 
     local sortByCountButton = CreateFrame("Button", "LootCounterGlobalSortByCountButton", frame, "UIPanelButtonTemplate")
-    sortByCountButton:SetPoint("TOPLEFT", 460, -30) -- Aligné avec la colonne Quantité
+    sortByCountButton:SetPoint("TOPLEFT", 460, -60) -- Aligné avec la colonne Quantité
     sortByCountButton:SetSize(80, 20)
     sortByCountButton:SetText("Quantity")
     sortByCountButton:SetScript("OnClick", function()
@@ -338,10 +364,11 @@ local function CreateGlobalStatsWindow()
     end)
 
     frame.sortMode = "name"
+    frame.filterText = "" -- Initialiser le texte du filtre
 
-    -- ScrollFrame pour le tableau (commence plus bas pour laisser de la place aux boutons)
+    -- ScrollFrame pour le tableau (décalé pour laisser de la place au filtre et aux boutons)
     local scrollFrame = CreateFrame("ScrollFrame", "LootCounterGlobalStatsScrollFrame", frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 10, -60) -- Décalé vers le bas pour laisser de la place aux boutons
+    scrollFrame:SetPoint("TOPLEFT", 10, -90) -- Décalé vers le bas
     scrollFrame:SetPoint("BOTTOMRIGHT", -30, 10)
 
     local content = CreateFrame("Frame", "LootCounterGlobalStatsContent", scrollFrame)
@@ -361,7 +388,13 @@ local function CreateGlobalStatsWindow()
         for _, entry in ipairs(db.entries) do
             local itemName = GetItemInfo(entry.itemID)
             if itemName then
-                table.insert(sortedEntries, { itemName = itemName, itemID = entry.itemID, source = entry.source, count = entry.count })
+                -- Appliquer le filtre
+                local filterText = frame.filterText or ""
+                local itemNameLower = itemName:lower()
+                local sourceLower = entry.source:lower()
+                if filterText == "" or itemNameLower:find(filterText) or sourceLower:find(filterText) then
+                    table.insert(sortedEntries, { itemName = itemName, itemID = entry.itemID, source = entry.source, count = entry.count })
+                end
             end
         end
 
@@ -379,7 +412,7 @@ local function CreateGlobalStatsWindow()
             end)
         end
 
-        local yOffset = -10 -- Plus besoin d'espace pour les en-têtes
+        local yOffset = -10
         local rowIndex = 1
         for _, entry in ipairs(sortedEntries) do
             local itemName, itemLink = GetItemInfo(entry.itemID)
@@ -391,7 +424,7 @@ local function CreateGlobalStatsWindow()
                 local col1 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
                 col1:SetPoint("LEFT", 0, 0)
                 col1:SetText(itemLink or itemName)
-                col1:SetWidth(250) -- Augmenter la largeur de la colonne Nom
+                col1:SetWidth(250)
                 col1:SetJustifyH("LEFT")
 
                 local col1HitBox = CreateFrame("Frame", nil, row)
@@ -409,13 +442,13 @@ local function CreateGlobalStatsWindow()
 
                 local col2 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
                 col2:SetPoint("LEFT", 250, 0)
-                col2:SetWidth(200) -- Augmenter la largeur de la colonne Source
+                col2:SetWidth(200)
                 col2:SetJustifyH("LEFT")
                 col2:SetText(entry.source)
 
                 local col3 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
                 col3:SetPoint("LEFT", 450, 0)
-                col3:SetWidth(100) -- Réduire la largeur de la colonne Quantité
+                col3:SetWidth(100)
                 col3:SetJustifyH("LEFT")
                 col3:SetText(entry.count)
 
@@ -546,7 +579,6 @@ local function CreateSessionStatsWindow()
     local content = CreateFrame("Frame", "LootCounterSessionStatsContent", frame.scrollFrame)
     content:SetSize(500, 200)
     frame.scrollFrame:SetScrollChild(content)
-
 
     -- ScrollFrame pour la vue "Historique"
     frame.historyScrollFrame = CreateFrame("ScrollFrame", "LootCounterSessionHistoryScrollFrame", frame, "UIPanelScrollFrameTemplate")
@@ -717,80 +749,80 @@ local function CreateSessionStatsWindow()
     end
 
     -- Fonction pour mettre à jour le tableau (Historique)
-	local function UpdateHistoryTable()
-		if frame.currentView ~= "history" then return end
+    local function UpdateHistoryTable()
+        if frame.currentView ~= "history" then return end
 
-		if historyContent.rows then
-			for _, row in ipairs(historyContent.rows) do
-				row:Hide()
-			end
-		end
-		historyContent.rows = {}
+        if historyContent.rows then
+            for _, row in ipairs(historyContent.rows) do
+                row:Hide()
+            end
+        end
+        historyContent.rows = {}
 
-		local yOffset = -10
-		local rowIndex = 1
-		-- print("Debug - db.farmSessionHistory : " .. tostring(db.farmSessionHistory))
-		if db.farmSessionHistory and type(db.farmSessionHistory) == "table" then
-			for i, session in ipairs(db.farmSessionHistory) do
-				local sessionHeader = historyContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-				sessionHeader:SetPoint("TOPLEFT", 10, yOffset)
-				sessionHeader:SetText("Session " .. i .. " (" .. date("%Y-%m-%d %H:%M:%S", session.endTime) .. ", Last For: " .. FormatTime(session.duration) .. ")")
-				table.insert(historyContent.rows, sessionHeader)
-				yOffset = yOffset - 20
+        local yOffset = -10
+        local rowIndex = 1
+        -- print("Debug - db.farmSessionHistory : " .. tostring(db.farmSessionHistory))
+        if db.farmSessionHistory and type(db.farmSessionHistory) == "table" then
+            for i, session in ipairs(db.farmSessionHistory) do
+                local sessionHeader = historyContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                sessionHeader:SetPoint("TOPLEFT", 10, yOffset)
+                sessionHeader:SetText("Session " .. i .. " (" .. date("%Y-%m-%d %H:%M:%S", session.endTime) .. ", Last For: " .. FormatTime(session.duration) .. ")")
+                table.insert(historyContent.rows, sessionHeader)
+                yOffset = yOffset - 20
 
-				-- Vérifier que session.entries est une table avant d'itérer
-				if session.entries and type(session.entries) == "table" then
-					for _, entry in ipairs(session.entries) do
-						local itemName, itemLink = GetItemInfo(entry.itemID)
-						if itemName then
-							local row = CreateFrame("Frame", nil, historyContent)
-							row:SetPoint("TOPLEFT", 10, yOffset)
-							row:SetSize(500, 20)
+                -- Vérifier que session.entries est une table avant d'itérer
+                if session.entries and type(session.entries) == "table" then
+                    for _, entry in ipairs(session.entries) do
+                        local itemName, itemLink = GetItemInfo(entry.itemID)
+                        if itemName then
+                            local row = CreateFrame("Frame", nil, historyContent)
+                            row:SetPoint("TOPLEFT", 10, yOffset)
+                            row:SetSize(500, 20)
 
-							local col1 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-							col1:SetPoint("LEFT", 0, 0)
-							col1:SetText(itemLink or itemName)
-							col1:SetWidth(190)
-							col1:SetJustifyH("LEFT")
-							row:EnableMouse(true)
-							row:SetScript("OnEnter", function()
-								GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-								GameTooltip:SetHyperlink("item:" .. entry.itemID)
-								GameTooltip:Show()
-							end)
-							row:SetScript("OnLeave", function()
-								GameTooltip:Hide()
-							end)
+                            local col1 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                            col1:SetPoint("LEFT", 0, 0)
+                            col1:SetText(itemLink or itemName)
+                            col1:SetWidth(190)
+                            col1:SetJustifyH("LEFT")
+                            row:EnableMouse(true)
+                            row:SetScript("OnEnter", function()
+                                GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+                                GameTooltip:SetHyperlink("item:" .. entry.itemID)
+                                GameTooltip:Show()
+                            end)
+                            row:SetScript("OnLeave", function()
+                                GameTooltip:Hide()
+                            end)
 
-							local col2 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-							col2:SetPoint("LEFT", 200, 0)
-							col2:SetWidth(200)
-							col2:SetJustifyH("LEFT")
-							col2:SetText(entry.source)
+                            local col2 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                            col2:SetPoint("LEFT", 200, 0)
+                            col2:SetWidth(200)
+                            col2:SetJustifyH("LEFT")
+                            col2:SetText(entry.source)
 
-							local col3 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-							col3:SetPoint("LEFT", 400, 0)
-							col3:SetText(entry.count)
+                            local col3 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                            col3:SetPoint("LEFT", 400, 0)
+                            col3:SetText(entry.count)
 
-							table.insert(historyContent.rows, row)
-							yOffset = yOffset - 20
-							rowIndex = rowIndex + 1
-						end
-					end
-				else
-					-- print("Debug - session.entries manquant ou invalide pour la session " .. i)
-				end
-				yOffset = yOffset - 10
-			end
-		else
-			local noHistoryText = historyContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-			noHistoryText:SetPoint("TOPLEFT", 10, yOffset)
-			noHistoryText:SetText("Aucune session dans l'historique.")
-			table.insert(historyContent.rows, noHistoryText)
-			rowIndex = rowIndex + 1
-		end
-		historyContent:SetHeight(rowIndex * 20)
-	end
+                            table.insert(historyContent.rows, row)
+                            yOffset = yOffset - 20
+                            rowIndex = rowIndex + 1
+                        end
+                    end
+                else
+                    -- print("Debug - session.entries manquant ou invalide pour la session " .. i)
+                end
+                yOffset = yOffset - 10
+            end
+        else
+            local noHistoryText = historyContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            noHistoryText:SetPoint("TOPLEFT", 10, yOffset)
+            noHistoryText:SetText("Aucune session dans l'historique.")
+            table.insert(historyContent.rows, noHistoryText)
+            rowIndex = rowIndex + 1
+        end
+        historyContent:SetHeight(rowIndex * 20)
+    end
 
     -- Stocker les fonctions UpdateTable et UpdateHistoryTable dans le frame
     frame.UpdateTable = UpdateTable
@@ -818,8 +850,8 @@ local function CreateSessionStatsWindow()
             end
         end)
     end
-	
-	-- Masquer la fenêtre par défaut
+    
+    -- Masquer la fenêtre par défaut
     frame:Hide()
 
     return frame
@@ -940,9 +972,9 @@ frame:SetScript("OnEvent", function(self, event, arg1, ...)
         end
     elseif event == "CHAT_MSG_LOOT" or event == "COMBAT_LOG_EVENT_UNFILTERED" or event == "PLAYER_TARGET_CHANGED" or event == "LOOT_OPENED" then
         TrackLoot(self, event, arg1, ...)
-	    if event == "CHAT_MSG_LOOT" then
+        if event == "CHAT_MSG_LOOT" then
             currentMiningSource = nil
-        end	
+        end    
     elseif event == "PLAYER_LOGOUT" then
         -- print("Sauvegarde de LootCounterDB avant déconnexion :")
         for key, value in pairs(db) do
