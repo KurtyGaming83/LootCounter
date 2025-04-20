@@ -1,5 +1,5 @@
 -- Coded by bnet : kurty#2232
--- v.0.7 (removed debug messages)
+-- v.0.9 (fixed count increment issue after 99)
 
 -- Définir la base de données persistante
 local db
@@ -128,8 +128,7 @@ local function TrackLoot(self, event, message, ...)
             local itemID = string.match(itemLink, "item:(%d+)")
             if itemID then
                 itemID = tonumber(itemID)
-                local quantity = string.match(message, "x(%d+)") or 1
-                quantity = tonumber(quantity)
+                local quantity = tonumber(string.match(message, "x(%d+)") or 1)
                 local source = GetLootSource(itemID, currentMiningSource)
                 if not db.entries then
                     db.entries = {}
@@ -137,7 +136,7 @@ local function TrackLoot(self, event, message, ...)
                 local found = false
                 for _, entry in ipairs(db.entries) do
                     if entry.itemID == itemID and entry.source == source then
-                        entry.count = entry.count + quantity
+                        entry.count = tonumber(entry.count or 0) + quantity
                         found = true
                         break
                     end
@@ -155,7 +154,7 @@ local function TrackLoot(self, event, message, ...)
                     local sessionFound = false
                     for _, entry in ipairs(db.farmSession.entries) do
                         if entry.itemID == itemID and entry.source == source then
-                            entry.count = entry.count + quantity
+                            entry.count = tonumber(entry.count or 0) + quantity
                             sessionFound = true
                             break
                         end
@@ -224,14 +223,14 @@ local function UpdateTooltip(tooltip)
         if db.entries then
             for _, entry in ipairs(db.entries) do
                 if entry.itemID == itemID then
-                    totalCount = totalCount + entry.count
+                    totalCount = totalCount + tonumber(entry.count or 0)
                 end
             end
         end
         if isFarmSessionActive and db.farmSession and db.farmSession.entries then
             for _, entry in ipairs(db.farmSession.entries) do
                 if entry.itemID == itemID then
-                    sessionCount = sessionCount + entry.count
+                    sessionCount = sessionCount + tonumber(entry.count or 0)
                 end
             end
         end
@@ -383,7 +382,7 @@ local function CreateGlobalStatsWindow()
                 local itemMatch = itemFilterText == "" or itemNameLower:find(itemFilterText)
                 local sourceMatch = sourceFilterText == "" or sourceLower:find(sourceFilterText)
                 if itemMatch and sourceMatch then
-                    table.insert(sortedEntries, { itemName = itemName, itemID = entry.itemID, source = entry.source, count = entry.count })
+                    table.insert(sortedEntries, { itemName = itemName, itemID = entry.itemID, source = entry.source, count = tonumber(entry.count or 0) })
                 end
             end
         end
@@ -588,7 +587,7 @@ local function CreateSessionStatsWindow()
             }
             if db.farmSession and db.farmSession.entries then
                 for _, entry in ipairs(db.farmSession.entries) do
-                    table.insert(sessionData.entries, { itemID = entry.itemID, source = entry.source, count = entry.count })
+                    table.insert(sessionData.entries, { itemID = entry.itemID, source = entry.source, count = tonumber(entry.count or 0) })
                 end
             end
             table.insert(db.farmSessionHistory, sessionData)
@@ -648,7 +647,7 @@ local function CreateSessionStatsWindow()
             for _, entry in ipairs(db.farmSession.entries) do
                 local itemName = GetItemInfo(entry.itemID)
                 if itemName then
-                    table.insert(sortedEntries, { itemName = itemName, itemID = entry.itemID, source = entry.source, count = entry.count })
+                    table.insert(sortedEntries, { itemName = itemName, itemID = entry.itemID, source = entry.source, count = tonumber(entry.count or 0) })
                 end
             end
         end
@@ -672,11 +671,11 @@ local function CreateSessionStatsWindow()
         for _, entry in ipairs(sortedEntries) do
             local itemName, itemLink = GetItemInfo(entry.itemID)
             if itemName then
-                local row = CreateFrame("Frame", nil, content)
+                local row = CreateFrame("Frame", null, content)
                 row:SetPoint("TOPLEFT", 10, yOffset)
                 row:SetSize(500, 20)
 
-                local col1 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                local col1 = row:CreateFontString(null, "OVERLAY", "GameFontHighlight")
                 col1:SetPoint("LEFT", 0, 0)
                 col1:SetText(itemLink or itemName)
                 col1:SetWidth(190)
@@ -691,13 +690,13 @@ local function CreateSessionStatsWindow()
                     GameTooltip:Hide()
                 end)
 
-                local col2 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                local col2 = row:CreateFontString(null, "OVERLAY", "GameFontHighlight")
                 col2:SetPoint("LEFT", 200, 0)
                 col2:SetWidth(200)
                 col2:SetJustifyH("LEFT")
                 col2:SetText(entry.source)
 
-                local col3 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                local col3 = row:CreateFontString(null, "OVERLAY", "GameFontHighlight")
                 col3:SetPoint("LEFT", 400, 0)
                 col3:SetText(entry.count)
 
@@ -723,7 +722,7 @@ local function CreateSessionStatsWindow()
         local rowIndex = 1
         if db.farmSessionHistory and type(db.farmSessionHistory) == "table" then
             for i, session in ipairs(db.farmSessionHistory) do
-                local sessionHeader = historyContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                local sessionHeader = historyContent:CreateFontString(null, "OVERLAY", "GameFontNormal")
                 sessionHeader:SetPoint("TOPLEFT", 10, yOffset)
                 sessionHeader:SetText("Session " .. i .. " (" .. date("%Y-%m-%d %H:%M:%S", session.endTime) .. ", Last For: " .. FormatTime(session.duration) .. ")")
                 table.insert(historyContent.rows, sessionHeader)
@@ -733,11 +732,11 @@ local function CreateSessionStatsWindow()
                     for _, entry in ipairs(session.entries) do
                         local itemName, itemLink = GetItemInfo(entry.itemID)
                         if itemName then
-                            local row = CreateFrame("Frame", nil, historyContent)
+                            local row = CreateFrame("Frame", null, historyContent)
                             row:SetPoint("TOPLEFT", 10, yOffset)
                             row:SetSize(500, 20)
 
-                            local col1 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                            local col1 = row:CreateFontString(null, "OVERLAY", "GameFontHighlight")
                             col1:SetPoint("LEFT", 0, 0)
                             col1:SetText(itemLink or itemName)
                             col1:SetWidth(190)
@@ -752,15 +751,15 @@ local function CreateSessionStatsWindow()
                                 GameTooltip:Hide()
                             end)
 
-                            local col2 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                            local col2 = row:CreateFontString(null, "OVERLAY", "GameFontHighlight")
                             col2:SetPoint("LEFT", 200, 0)
                             col2:SetWidth(200)
                             col2:SetJustifyH("LEFT")
                             col2:SetText(entry.source)
 
-                            local col3 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                            local col3 = row:CreateFontString(null, "OVERLAY", "GameFontHighlight")
                             col3:SetPoint("LEFT", 400, 0)
-                            col3:SetText(entry.count)
+                            col3:SetText(tonumber(entry.count or 0))
 
                             table.insert(historyContent.rows, row)
                             yOffset = yOffset - 20
@@ -771,7 +770,7 @@ local function CreateSessionStatsWindow()
                 yOffset = yOffset - 10
             end
         else
-            local noHistoryText = historyContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            local noHistoryText = historyContent:CreateFontString(null, "OVERLAY", "GameFontNormal")
             noHistoryText:SetPoint("TOPLEFT", 10, yOffset)
             noHistoryText:SetText("Aucune session dans l'historique.")
             table.insert(historyContent.rows, noHistoryText)
@@ -835,6 +834,27 @@ frame:SetScript("OnEvent", function(self, event, arg1, ...)
         db = LootCounterDB or {}
         LootCounterDB = db
 
+        -- Nettoyer les données pour s'assurer que count est un nombre
+        if db.entries then
+            for _, entry in ipairs(db.entries) do
+                entry.count = tonumber(entry.count or 0)
+            end
+        end
+        if db.farmSession and db.farmSession.entries then
+            for _, entry in ipairs(db.farmSession.entries) do
+                entry.count = tonumber(entry.count or 0)
+            end
+        end
+        if db.farmSessionHistory then
+            for _, session in ipairs(db.farmSessionHistory) do
+                if session.entries then
+                    for _, entry in ipairs(session.entries) do
+                        entry.count = tonumber(entry.count or 0)
+                    end
+                end
+            end
+        end
+
         if db[1] or db.testValue then
             local oldData = db
             db = {}
@@ -842,7 +862,7 @@ frame:SetScript("OnEvent", function(self, event, arg1, ...)
             for itemID, data in pairs(oldData) do
                 if type(itemID) == "number" and data.sources then
                     for source, count in pairs(data.sources) do
-                        table.insert(db.entries, { itemID = itemID, source = source, count = count })
+                        table.insert(db.entries, { itemID = itemID, source = source, count = tonumber(count or 0) })
                     end
                 end
             end
@@ -852,7 +872,7 @@ frame:SetScript("OnEvent", function(self, event, arg1, ...)
                 for itemID, data in pairs(oldData.farmSession) do
                     if type(itemID) == "number" and data.sources then
                         for source, count in pairs(data.sources) do
-                            table.insert(db.farmSession.entries, { itemID = itemID, source = source, count = count })
+                            table.insert(db.farmSession.entries, { itemID = itemID, source = source, count = tonumber(count or 0) })
                         end
                     end
                 end
